@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.claude/
+_*.py
+naaim_raw.xlsx
+aaii_raw.xls
+server.log

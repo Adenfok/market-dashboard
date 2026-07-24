@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>US Equity Entry Timing</title>
+<style>
+  :root{
+    --bg:#0b0f17; --panel:#141b28; --panel2:#1b2433; --line:#26314459;
+    --txt:#e8edf5; --muted:#8ea0ba; --muted2:#64748b;
+    --buy:#22c55e; --leanbuy:#84cc16; --neutral:#eab308;
+    --leansell:#f97316; --sell:#ef4444; --accent:#3b82f6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 50% -10%,#16233b 0%,var(--bg) 60%);
+       color:var(--txt);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+       min-height:100vh;padding:28px 18px 60px}
+  .wrap{max-width:1060px;margin:0 auto}
+  header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+  h1{font-size:22px;margin:0 0 4px;letter-spacing:.2px}
+  .sub{color:var(--muted);font-size:13px}
+  button{background:var(--accent);color:#fff;border:0;border-radius:9px;padding:10px 16px;
+         font-size:14px;font-weight:600;cursor:pointer;transition:.15s}
+  button:hover{filter:brightness(1.1)} button:disabled{opacity:.5;cursor:default}
+
+  .hero{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
+        border-radius:18px;padding:26px;display:grid;grid-template-columns:220px 1fr;gap:26px;
+        align-items:center;margin-bottom:22px}
+  @media(max-width:640px){.hero{grid-template-columns:1fr;text-align:center}}
+  .gauge{position:relative;width:200px;height:200px;margin:0 auto}
+  .gauge svg{transform:rotate(-90deg)}
+  .gauge .num{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .gauge .num b{font-size:46px;line-height:1;font-variant-numeric:tabular-nums}
+  .gauge .num span{font-size:12px;color:var(--muted);margin-top:4px;letter-spacing:.5px}
+  .verdict h2{margin:0 0 8px;font-size:24px}
+  .verdict p{margin:0;color:var(--muted);max-width:52ch}
+  .pill{display:inline-block;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:700;
+        letter-spacing:.4px;text-transform:uppercase;margin-bottom:12px}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px 18px 16px}
+  .card .top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  .card .name{font-weight:700;font-size:15px}
+  .card .asof{font-size:11px;color:var(--muted2);white-space:nowrap}
+  .card .val{font-size:34px;font-weight:700;margin:6px 0 2px;font-variant-numeric:tabular-nums}
+  .card .val small{font-size:14px;font-weight:600;color:var(--muted)}
+  .card .read{font-size:13px;color:var(--muted);min-height:34px}
+  .bar{height:8px;border-radius:6px;background:#0c1220;overflow:hidden;margin:12px 0 6px;position:relative}
+  .bar>i{display:block;height:100%;border-radius:6px;transition:width .5s ease}
+  .barlab{display:flex;justify-content:space-between;font-size:11px;color:var(--muted2)}
+  .err{color:var(--sell);font-size:13px}
+  .method{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:2px 18px}
+  .method>summary{cursor:pointer;padding:16px 0;font-weight:700;font-size:15px;list-style:none;display:flex;align-items:center;gap:8px}
+  .method>summary::-webkit-details-marker{display:none}
+  .method>summary::before{content:"▸";color:var(--accent);transition:.2s}
+  .method[open]>summary::before{transform:rotate(90deg)}
+  .method-body{padding:0 0 16px;color:var(--muted);font-size:13px}
+  .method-body p{margin:0 0 12px;max-width:70ch}
+  .method-body table{width:100%;border-collapse:collapse;margin:8px 0 14px}
+  .method-body td{padding:7px 10px 7px 0;border-top:1px solid var(--line);vertical-align:top}
+  .method-body td:first-child{color:var(--txt);font-weight:600;white-space:nowrap}
+  .method-body tr.total td{border-top:1px solid var(--accent)}
+  .method-body tr.total td:first-child{color:var(--accent)}
+  .method-body code{background:#0c1220;color:#cfe0ff;padding:2px 7px;border-radius:6px;font-size:12px;white-space:nowrap}
+  .method-body .bands span{color:var(--txt)}
+  footer{margin-top:26px;color:var(--muted2);font-size:12px;line-height:1.6;border-top:1px solid var(--line);padding-top:16px}
+  .loading{text-align:center;color:var(--muted);padding:60px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>US Equity Market — Entry Timing</h1>
+      <div class="sub" id="stamp">Loading live data…</div>
+    </div>
+    <button id="refresh" onclick="load(true)">↻ Refresh data</button>
+  </header>
+
+  <div id="app"><div class="loading">Fetching VIX, RSI, Fear &amp; Greed, AAII, NAAIM…</div></div>
+
+  <details class="method">
+    <summary>How the score is computed (v2 — backtest-tuned)</summary>
+    <div class="method-body">
+      <p>Each indicator becomes a <b>0–100 favor score</b> (higher = more fear / oversold /
+         defensive → historically a better time to buy), then they're combined in a
+         <b>weighted</b> average. Weights and mappings were tuned on 15 years (2011–26) and
+         validated out-of-sample — see <code>backtest.py</code> / <code>walkforward.py</code>.</p>
+      <table>
+        <tr><td>VIX <b>×0.31</b></td><td><code>(VIX − 12) / 28 × 100</code></td><td>best component (both tails work)</td></tr>
+        <tr><td>RSP RSI(14) <b>×0.21</b></td><td><code>(70 − RSI) / 40 × 100</code></td><td>70→0 overbought · 30→100 oversold</td></tr>
+        <tr><td>NAAIM <b>×0.17</b></td><td><code>100 − exposure</code></td><td>defensive→high · fully long→low</td></tr>
+        <tr><td>Fear &amp; Greed <b>×0.16</b></td><td><code>non-linear</code></td><td>reward extreme fear · greed ≈ neutral · euphoria mild penalty</td></tr>
+        <tr><td>AAII <b>×0.15</b></td><td><code>one-sided</code></td><td>bearish crowd→up to 100 · bullish ignored</td></tr>
+        <tr class="total"><td>Composite</td><td><code>weighted average</code></td><td>renormalized if any missing, 0–100</td></tr>
+      </table>
+      <p class="bands"><b>Verdict bands (recalibrated — edge begins ≈60):</b>
+        <span>≥70 strong buy</span> · <span>60–69 buy</span> · <span>43–59 neutral</span> ·
+        <span>30–42 caution</span> · <span>&lt;30 poor</span></p>
+    </div>
+  </details>
+
+  <footer>
+    <b>How to read this:</b> A <b>contrarian</b> composite — higher = more fear / oversold / defensive =
+    historically a better entry. The big number is the <b>weighted</b> score (VIX-led). Backtested over
+    15 years: the <b>Strong buy (≥70)</b> band averaged ~+4.6% over the next month (74% positive); the edge
+    begins around 60; below that there's no reliable timing signal.<br>
+    <b>Disclaimer:</b> For educational purposes only. This is not financial advice, not a recommendation to buy
+    or sell any security, and past sentiment patterns do not guarantee future results. Do your own research.
+  </footer>
+</div>
+
+<script>
+const TONE = {
+  "strong-buy": {c:"var(--buy)",      label:"Strong buy"},
+  "buy":        {c:"var(--leanbuy)",  label:"Buy"},
+  "neutral":    {c:"var(--neutral)",  label:"Neutral"},
+  "caution":    {c:"var(--leansell)", label:"Caution"},
+  "poor":       {c:"var(--sell)",     label:"Avoid"},
+};
+function favColor(f){
+  if(f>=70)return"var(--buy)"; if(f>=60)return"var(--leanbuy)";
+  if(f>=43)return"var(--neutral)"; if(f>=30)return"var(--leansell)"; return"var(--sell)";
+}
+const fmt = n => (n===null||n===undefined||isNaN(n))?"—":n;
+
+function readVIX(d){return d.ok?`Level ${d.value}. ${d.value>=30?"High fear.":d.value>=20?"Elevated fear.":d.value>=15?"Calm / normal.":"Complacent (low)."}`:"";}
+function readRSI(d){return d.ok?`RSP at ${d.price}. RSI ${d.value} — ${d.value>=70?"overbought.":d.value>=55?"firm momentum.":d.value>=45?"neutral.":d.value>=30?"soft.":"oversold."}`:"";}
+function readFG(d){return d.ok?`${d.value<=25?"Extreme fear.":d.value<=45?"Fear.":d.value<=55?"Neutral.":d.value<=75?"Greed.":"Extreme greed."} Contrarian positive when low.`:"";}
+function readAAII(d){return d.ok?`Bull ${d.bullish}% · Bear ${d.bearish}% · Spread ${d.spread>0?"+":""}${d.spread}. Crowd is ${d.spread>10?"bullish":d.spread<-10?"bearish":"balanced"}.`:"";}
+function readNAAIM(d){return d.ok?`Managers ${d.value}% net long — ${d.value>=90?"very aggressive.":d.value>=70?"high exposure.":d.value>=40?"moderate.":"defensive."}`:"";}
+
+const META = [
+  {k:"vix",       name:"VIX (Volatility)",   unit:"",   read:readVIX,   main:d=>d.value},
+  {k:"rsp_rsi",   name:"RSP RSI(14)",        unit:"",   read:readRSI,   main:d=>d.value},
+  {k:"fear_greed",name:"Fear & Greed Index", unit:"/100",read:readFG,   main:d=>d.value},
+  {k:"aaii",      name:"AAII Survey",        unit:"spread",read:readAAII,main:d=>(d.spread>0?"+":"")+d.spread},
+  {k:"naaim",     name:"NAAIM Exposure",     unit:"%",  read:readNAAIM, main:d=>d.value},
+];
+
+function card(m,d){
+  if(!d || !d.ok){
+    return `<div class="card"><div class="top"><span class="name">${m.name}</span></div>
+      <div class="val">—</div><div class="err">Data unavailable${d&&d.error?": "+d.error:""}</div></div>`;
+  }
+  const c=favColor(d.favor);
+  const stale=d.stale?` <span title="Live fetch failed; showing last saved reading" style="color:var(--leansell)">· cached</span>`:"";
+  return `<div class="card">
+    <div class="top"><span class="name">${m.name}</span><span class="asof">as of ${d.asof||"—"}${stale}</span></div>
+    <div class="val">${m.main(d)} <small>${m.unit}</small></div>
+    <div class="read">${m.read(d)}</div>
+    <div class="bar"><i style="width:${d.favor}%;background:${c}"></i></div>
+    <div class="barlab"><span>Greed / overbought</span><span style="color:${c};font-weight:700">Favor ${d.favor}</span><span>Fear / oversold</span></div>
+  </div>`;
+}
+
+function gauge(score,color){
+  const r=86,C=2*Math.PI*r,off=C*(1-(score/100));
+  return `<div class="gauge"><svg width="200" height="200" viewBox="0 0 200 200">
+    <circle cx="100" cy="100" r="${r}" fill="none" stroke="#0c1220" stroke-width="16"/>
+    <circle cx="100" cy="100" r="${r}" fill="none" stroke="${color}" stroke-width="16"
+      stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${off}"/>
+    </svg><div class="num"><b>${score}</b><span>COMPOSITE / 100</span></div></div>`;
+}
+
+function render(rep){
+  document.getElementById("stamp").textContent =
+    `Live data · generated ${rep.generated} · ${rep.available}/5 indicators loaded`;
+  const t=TONE[rep.verdict.tone]||TONE.neutral;
+  const score=rep.composite===null?0:rep.composite;
+  const hero=`<div class="hero">
+     ${gauge(score,t.c)}
+     <div class="verdict">
+       <span class="pill" style="background:${t.c}22;color:${t.c};border:1px solid ${t.c}55">${t.label}</span>
+       <h2>${rep.verdict.headline}</h2>
+       <p>${rep.verdict.detail}</p>
+     </div></div>`;
+  const cards=`<div class="grid">${META.map(m=>card(m,rep.indicators[m.k])).join("")}</div>`;
+  document.getElementById("app").innerHTML=hero+cards;
+}
+
+async function load(refresh){
+  const btn=document.getElementById("refresh");
+  btn.disabled=true; btn.textContent="Loading…";
+  try{
+    const res=await fetch("data.json?t="+Date.now());
+    render(await res.json());
+  }catch(e){
+    document.getElementById("app").innerHTML=`<div class="loading err">Failed to load: ${e}</div>`;
+  }finally{
+    btn.disabled=false; btn.textContent="↻ Refresh data";
+  }
+}
+load(false);
+</script>
+</body>
+</html>
